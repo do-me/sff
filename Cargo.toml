@@ -6,7 +6,7 @@ description = "SemanticFileFinder (sff): Fast semantic file finder using sentenc
 readme = "README.md"
 repository = "https://github.com/your_username/sff" # TODO: Update with your repository URL
 license = "MIT OR Apache-2.0" # Choose a license
-keywords = ["semantic search", "cli", "embeddings", "nlp"]
+keywords = ["semantic-search", "cli", "embeddings", "nlp"]
 categories = ["command-line-utilities", "text-processing"]
 edition = "2021"
 
