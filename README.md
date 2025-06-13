@@ -12,7 +12,7 @@ Once `sff` is published on crates.io, you can install it using Cargo:
 
 ```bash
 cargo install sff
-sff "how to drop an element from an array in javascript"
+sff "project ideas for rust"
 ```
 Ensure `~/.cargo/bin` is in your system's `PATH`. Deafult is cwd with `--path .`
 
