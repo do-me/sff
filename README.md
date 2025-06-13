@@ -1,11 +1,35 @@
 # SemanticFileFinder (sff)
 
 [![crates.io](https://img.shields.io/crates/v/sff.svg)](https://crates.io/crates/sff)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
-<!-- TODO: Add your repository URL badge here if you have one -->
-<!-- [![GitHub stars](https://img.shields.io/github/stars/your_username/sff.svg?style=social)](https://github.com/your_username/sff) -->
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/do-me/sff.svg?style=social)](https://github.com/your_username/sff)
 
 **sff (SemanticFileFinder)** is a command-line tool that rapidly searches for files in a given directory based on the semantic meaning of your query. It leverages sentence embeddings through `model2vec-rs` to understand content, not just keywords. It reads `.txt`, `.md`, and `.mdx` files, chunks their content, and ranks them by similarity to find the most relevant text snippets.
+
+## Installation & Quick Start
+
+Once `sff` is published on crates.io, you can install it using Cargo:
+
+```bash
+cargo install sff
+sff "how to drop an element from an array in javascript"
+```
+Ensure `~/.cargo/bin` is in your system's `PATH`. Deafult is cwd with `--path .`
+
+I use this tool myself to scan my personal notes. In the past these were simple .txt files in a folder until I migrated everything to iCloud + Obsidian. Here is some sample output from some random notes:
+
+![My notess](sample_output.png)
+
+## Performance 
+
+tl;dr: under 250ms for English-only models on ~2500 files and 10k chunks (with 20 words per chunk) on an M3 Max. If you need the best possible results and good multilingual retrieval, go for `minishlab/potion-multilingual-128M`.
+Else, stick to the default with `minishlab/potion-retrieval-32M`. Keep an eye on new model2vec models here: https://huggingface.co/minishlab.
+
+| Command                                                                     | Model                    | Query      | Files | Chunks | Time (ms) |
+| --------------------------------------------------------------------------- | ------------------------ | ---------- | ----- | ------ | --------- |
+| `sff -m "minishlab/potion-base-8M" "javascript"`           | potion-base-8M           | javascript | 2537  | 10000  | 209.34    |
+| `sff -m "minishlab/potion-retrieval-32M" "javascript"`     | potion-retrieval-32M     | javascript | 2537  | 10000  | 249.95    |
+| `sff -m "minishlab/potion-multilingual-128M" "javascript"` | potion-multilingual-128M | javascript | 2537  | 10000  | 1001.69   |
 
 ## Features
 
@@ -22,16 +46,6 @@
     *   Enable recursive search through subdirectories.
 *   **Verbose Mode:** Offers detailed timing information for performance analysis.
 *   **Clickable File Paths:** Output paths are formatted for easy opening in most terminals.
-
-## Installation
-
-Once `sff` is published on crates.io, you can install it using Cargo:
-
-```bash
-cargo install sff
-```
-
-Ensure `~/.cargo/bin` is in your system's `PATH`.
 
 ## Usage
 
@@ -55,7 +69,7 @@ sff [OPTIONS] <QUERY>...
 
 *   Use a different model and limit results to 5:
     ```bash
-    sff -m "sentence-transformers/all-MiniLM-L6-v2" -l 5 "benefits of parallel computing"
+    sff -m "minishlab/potion-multilingual-128M" -l 5 "benefits of parallel computing"
     ```
 
 **All Options:**
@@ -103,14 +117,13 @@ Options:
 
 ## Development
 
-<!-- TODO: Add contribution guidelines or development setup if you plan for it -->
+- Add https://github.com/benbrandt/text-splitter as chunker and allow the user to customize chunking
+
+PR's always welcome!
 
 ## License
 
-This project is licensed under either of
-* Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
-at your option.
+* MIT
 
 ---
-Built by Dominik Weckmüller.
+Built by Dominik Weckmüller. If you like semantic search, check out my other work on [GitHub](https://github.com/do-me) e.g. [SemanticFinder](https://github.com/do-me/SemanticFinder)!
