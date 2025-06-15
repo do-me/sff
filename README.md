@@ -115,9 +115,17 @@ Options:
 
 `sff` uses `model2vec-rs`, which typically downloads models from the [Hugging Face Hub](https://huggingface.co/models). The default model is `minishlab/potion-retrieval-32M`. You can specify any compatible sentence transformer model available on the Hub or a local path to a model. The first time you use a new model, it will be downloaded, which might take some time.
 
-## Development
+## Roadmap 
 
-- Add https://github.com/benbrandt/text-splitter as chunker and allow the user to customize chunking
+### Args 
+- Add all args to the cli like batch size (currently 128 texts of 20 words each)
+
+### Chunker
+- For now, add more arguments like number of words for chunking
+- In the long run, add https://github.com/benbrandt/text-splitter as chunker and allow the user to customize chunking
+
+### Output
+- Add multiple export options for the output table like JSON, CSV, Parquet and markdown (for potential LLM-pipelines). Possibly I'd just add polars as dependency and use their exporter https://docs.pola.rs/api/python/dev/reference/io.html
 
 PR's always welcome!
 
