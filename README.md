@@ -117,15 +117,16 @@ Options:
 
 ## Roadmap 
 
-### Args 
-- Add all args to the cli like batch size (currently 128 texts of 20 words each)
+### Mising Args 
+- batch size - currently 128 texts of 20 words each are inferenced at the same time
+- filetypes - currently only .txt, .md, .mdx but should be customizable as args
 
-### Chunker
+### Chunker Options
 - For now, add more arguments like number of words for chunking
 - In the long run, add https://github.com/benbrandt/text-splitter as chunker and allow the user to customize chunking
 
-### Output
-- Add multiple export options for the output table like JSON, CSV, Parquet and markdown (for potential LLM-pipelines). Possibly I'd just add polars as dependency and use their exporter https://docs.pola.rs/api/python/dev/reference/io.html
+### Output Options
+- Add multiple export options for the output table like JSON, CSV, Parquet and markdown (for potential LLM-pipelines). Possibly I'd just add polars or similar as dependency and use their exporter https://docs.pola.rs/api/python/dev/reference/io.html
 
 PR's always welcome!
 
