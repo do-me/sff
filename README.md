@@ -130,6 +130,15 @@ Options:
 
 PR's always welcome!
 
+## FAQ 
+
+### MacOS: Search folders in iCloud
+If you want to search any folder on iCloud (e.g. your Obsidian vault) you need to grant full disk access to your shell, e.g. iTerm2 in the system settings:
+
+![image](https://github.com/user-attachments/assets/ed059474-7f58-443d-8f04-477506715411)
+
+Reopen the shell and the problem should be fixed.
+
 ## License
 
 * MIT
