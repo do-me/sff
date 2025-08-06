@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Instant};
+use std::time::Instant;
 use walkdir::WalkDir;
 
 const CHUNK_EMBEDDING_BATCH_SIZE: usize = 128; // How many text chunks to embed in one go per parallel task
@@ -24,12 +24,16 @@ const WORD_CHUNK_SIZE: usize = 20; // How many words per text chunk
 struct TextChunk {
     path: PathBuf,
     text: String,
+    line_number: usize,
+    offset_in_line: usize,
 }
 
 struct SearchResult {
     score: f32,
     path: PathBuf,
     chunk: String,
+    line_number: usize,
+    offset_in_line: usize,
 }
 
 const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
@@ -52,7 +56,11 @@ where
         let start_time = Instant::now();
         let result = func();
         let duration = start_time.elapsed();
-        let bound_type = if is_cpu_bound { "CPU-bound" } else { "I/O-bound" };
+        let bound_type = if is_cpu_bound {
+            "CPU-bound"
+        } else {
+            "I/O-bound"
+        };
         eprintln!(
             "[VERBOSE] {}: {:.2} ms ({})",
             name,
@@ -71,9 +79,13 @@ fn main() -> Result<()> {
     let query_string = args.query.join(" ");
 
     // 1. DISCOVER, READ, AND CHUNK FILES
-    let (chunks, file_count) =
-        timed_block("File Discovery, Reading & Chunking", args.verbose, false, || {
-            let walker = WalkDir::new(&args.path).max_depth(if args.recursive { usize::MAX } else { 1 });
+    let (chunks, file_count) = timed_block(
+        "File Discovery, Reading & Chunking",
+        args.verbose,
+        false,
+        || {
+            let walker =
+                WalkDir::new(&args.path).max_depth(if args.recursive { usize::MAX } else { 1 });
             let collected_chunks: Vec<TextChunk> = walker
                 .into_iter()
                 .filter_map(Result::ok)
@@ -83,27 +95,60 @@ fn main() -> Result<()> {
                     let path = entry.path();
                     let extension = path.extension().and_then(|s| s.to_str());
                     match extension {
-                        Some("txt") | Some("md") | Some("mdx") => {
-                            match fs::read_to_string(path) {
-                                Ok(content) => Some((content, path.to_path_buf())),
-                                Err(e) => {
-                                    if args.verbose {
-                                        eprintln!("[VERBOSE] Failed to read {}: {}", path.display(), e);
-                                    }
-                                    None
+                        Some("txt") | Some("md") | Some("mdx") => match fs::read_to_string(path) {
+                            Ok(content) => Some((content, path.to_path_buf())),
+                            Err(e) => {
+                                if args.verbose {
+                                    eprintln!("[VERBOSE] Failed to read {}: {}", path.display(), e);
                                 }
+                                None
                             }
                         },
                         _ => None,
                     }
                 })
                 .flat_map(|(content, path)| {
-                    let words: Vec<&str> = content.split_whitespace().collect();
+                    let mut words: Vec<(usize, usize)> = Vec::new(); // Vec<(start, end)>
+                    let mut position = 0;
+                    for word in content.split_whitespace() {
+                        if let Some(relative_start) = content[position..].find(word) {
+                            let absolute_start = position + relative_start;
+                            let absolute_end = absolute_start + word.len();
+                            words.push((absolute_start, absolute_end));
+                            position = absolute_end;
+                        }
+                    }
+                    let mut newline_count: usize = 0;
                     words
                         .chunks(WORD_CHUNK_SIZE)
-                        .map(|word_slice| TextChunk {
-                            path: path.clone(),
-                            text: word_slice.join(" "),
+                        .map(|word_slice| {
+                            let start = word_slice.first().unwrap().0;
+                            let end = word_slice.last().unwrap().1;
+                            let substring = &content[start..end];
+
+                            let newline_positions: Vec<usize> =
+                                substring.match_indices('\n').map(|(idx, _)| idx).collect();
+                            let first_line_of_chunk = substring.lines().next().unwrap_or("");
+                            let mut line_number = 1;
+                            let mut offset_in_line = 0;
+                            for (idx, line) in content.lines().enumerate() {
+                                if idx >= newline_count {
+                                    if let Some(pos) = line.find(first_line_of_chunk) {
+                                        line_number = idx + 1;
+                                        offset_in_line = pos + 1;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            newline_count = newline_count + newline_positions.len();
+
+                            TextChunk {
+                                path: path.clone(),
+                                text: substring.to_string(),
+                                line_number: line_number,
+                                offset_in_line: offset_in_line,
+                            }
                         })
                         .collect::<Vec<_>>()
                 })
@@ -114,7 +159,8 @@ fn main() -> Result<()> {
                 unique_paths.len()
             };
             (collected_chunks, num_unique_files)
-        });
+        },
+    );
 
     if chunks.is_empty() {
         println!(
@@ -128,9 +174,10 @@ fn main() -> Result<()> {
     let model = timed_block("Model Loading", args.verbose, false, || {
         StaticModel::from_pretrained(&args.model, None, Some(true), None) // normalize=true
     })?;
-    
+
     if args.verbose && program_total_start_time.elapsed().as_secs_f32() > 0.5 {
-         eprintln!("[VERBOSE] Note: If model loading is slow (>500ms), it might be due to first-time download by hf-hub, or inefficiencies in the specific `model2vec-rs/model.rs::from_pretrained` version being used (e.g., for `unk_token` lookup). This part cannot be optimized further within `sff` itself without changing `model2vec-rs`."); // Changed fast_finder to sff
+        eprintln!("[VERBOSE] Note: If model loading is slow (>500ms), it might be due to first-time download by hf-hub, or inefficiencies in the specific `model2vec-rs/model.rs::from_pretrained` version being used (e.g., for `unk_token` lookup). This part cannot be optimized further within `sff` itself without changing `model2vec-rs`.");
+        // Changed fast_finder to sff
     }
 
     let model_arc = Arc::new(model);
@@ -173,17 +220,19 @@ fn main() -> Result<()> {
     // 5. CALCULATE SIMILARITY AND SORT RESULTS
     let query_vec: Array1<f32> = Array1::from(query_embedding);
 
-    let mut results: Vec<SearchResult> = timed_block("Similarity Calculation & Sorting", args.verbose, true, || {
+    let mut results: Vec<SearchResult> = timed_block("Similarity Calculation & Sorting", args.verbose,true, || {
         let mut collected_results: Vec<SearchResult> = chunk_embeddings
             .par_iter()
             .enumerate()
             .map(|(i, emb_ref)| {
-                let chunk_vec_view: ArrayView1<f32> = ArrayView1::from(emb_ref); 
+                let chunk_vec_view: ArrayView1<f32> = ArrayView1::from(emb_ref);
                 let sim = cosine_similarity(query_vec.view(), chunk_vec_view);
                 SearchResult {
                     score: sim,
                     path: chunks[i].path.clone(),
                     chunk: chunks[i].text.clone(),
+                    line_number: chunks[i].line_number.clone(),
+                    offset_in_line: chunks[i].offset_in_line.clone(),
                 }
             })
             .collect();
@@ -221,21 +270,33 @@ fn main() -> Result<()> {
         for result in results.iter_mut().take(args.limit) {
             const MAX_CHUNK_DISPLAY_LEN: usize = 100;
             if result.chunk.chars().count() > MAX_CHUNK_DISPLAY_LEN {
-                result.chunk = result.chunk.chars().take(MAX_CHUNK_DISPLAY_LEN).collect::<String>() + "...";
+                result.chunk = result
+                    .chunk
+                    .chars()
+                    .take(MAX_CHUNK_DISPLAY_LEN)
+                    .collect::<String>()
+                    + "...";
             }
             table.add_row(vec![
                 Cell::new(format!("{:.2}", result.score)),
                 Cell::new(&result.chunk),
-                Cell::new(format_path_for_terminal(&result.path)),
+                Cell::new(format_path_for_terminal(
+                    &result.path,
+                    &result.line_number,
+                    &result.offset_in_line,
+                )),
             ]);
         }
         println!("{table}");
     } else {
         println!("No matches found.");
     }
-    
+
     if args.verbose {
-       eprintln!("[VERBOSE] Result Printing End: {:.2} ms (cumulative)", program_total_start_time.elapsed().as_secs_f64() * 1000.0);
+        eprintln!(
+            "[VERBOSE] Result Printing End: {:.2} ms (cumulative)",
+            program_total_start_time.elapsed().as_secs_f64() * 1000.0
+        );
     }
 
     Ok(())
@@ -252,21 +313,30 @@ fn cosine_similarity(a: ArrayView1<f32>, b: ArrayView1<f32>) -> f32 {
     }
 }
 
-fn format_path_for_terminal(path: &Path) -> String {
+fn format_path_for_terminal(path: &Path, line_number: &usize, word_offset: &usize) -> String {
     let (path_to_display, is_canonical) = match path.canonicalize() {
         Ok(abs_path) => (abs_path, true),
-        Err(_) => (path.to_path_buf(), false), 
+        Err(_) => (path.to_path_buf(), false),
     };
-    
+
     let path_str = path_to_display.to_string_lossy();
     let encoded_path = utf8_percent_encode(&path_str, PATH_ENCODE_SET).to_string();
-    
+
     if is_canonical && path_str.starts_with("\\\\?\\") {
-        format!("file:///{}", path_str.trim_start_matches("\\\\?\\").replace('\\', "/"))
+        format!(
+            "file:///{}:{}:{}",
+            path_str.trim_start_matches("\\\\?\\").replace('\\', "/"),
+            line_number,
+            word_offset
+        )
     } else if cfg!(windows) && is_canonical {
-        format!("file:///{}", encoded_path.replace('\\', "/"))
-    }
-    else {
-         format!("file://{}", encoded_path)
+        format!(
+            "file:///{}:{}:{}",
+            encoded_path.replace('\\', "/"),
+            line_number,
+            word_offset
+        )
+    } else {
+        format!("file://{}:{}:{}", encoded_path, line_number, word_offset)
     }
 }

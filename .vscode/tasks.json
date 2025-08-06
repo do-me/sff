@@ -1,0 +1,12 @@
+{
+  "label": "cargo build",
+  "type": "shell",
+  "command": "cargo",
+  "args": [
+    "build"
+  ],
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "problemMatcher": ["$rustc"]
+}
