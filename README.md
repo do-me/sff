@@ -8,7 +8,7 @@
 
 ## Installation & Quick Start
 
-Once `sff` is published on crates.io, you can install it using Cargo:
+You can install `sff` using Cargo:
 
 ```bash
 cargo install sff
@@ -117,7 +117,7 @@ Options:
 
 ## Roadmap 
 
-### Mising Args 
+### Missing Args 
 - batch size - currently 128 texts of 20 words each are inferenced at the same time
 - filetypes - currently only .txt, .md, .mdx but should be customizable as args
 
