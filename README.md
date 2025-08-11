@@ -45,7 +45,7 @@ Else, stick to the default with `minishlab/potion-retrieval-32M`. Keep an eye on
     *   Limit the number of results.
     *   Enable recursive search through subdirectories.
 *   **Verbose Mode:** Offers detailed timing information for performance analysis.
-*   **Clickable File Paths:** Output paths are formatted for easy opening in most terminals.
+*   **Clickable File Paths with Line Numbers:** Output paths are formatted for easy opening in most terminals & VS Code with line numbers!
 
 ## Usage
 
