@@ -1,0 +1,21 @@
+{
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Rust",
+      "program": "${workspaceFolder}/target/debug/sff",
+      "args": ["${input:dynamicArg}"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "rust: cargo build"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "dynamicArg",
+      "type": "promptString",
+      "description": "Enter argument for SFF",
+      "default": "javascript"
+    }
+  ]
+}
