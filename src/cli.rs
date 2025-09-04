@@ -33,4 +33,8 @@ pub struct Args {
     /// Enable verbose mode to print detailed timings for nerds
     #[arg(short = 'v', long)]
     pub verbose: bool,
+
+    /// Output results in JSON format instead of table
+    #[arg(short = 'j', long)]
+    pub json: bool,
 }
