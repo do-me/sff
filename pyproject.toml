@@ -1,0 +1,6 @@
+[tool.sff]
+exclude_dirs = [
+    "target",
+    "**/.git",
+    "**/testdata",
+]
