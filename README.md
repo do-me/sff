@@ -8,13 +8,28 @@
 
 ## Installation & Quick Start
 
+### Install from crates.io
+
 You can install `sff` using Cargo:
 
 ```bash
 cargo install sff
 sff "project ideas for rust"
 ```
-Ensure `~/.cargo/bin` is in your system's `PATH`. Deafult is cwd with `--path .`
+Ensure `~/.cargo/bin` is in your system's `PATH`. Default is cwd with `--path .`
+
+### Build from Source
+
+To build and install from source:
+
+```bash
+git clone https://github.com/do-me/sff.git
+cd sff
+cargo build --release
+cargo install --path .
+```
+
+The binary will be available in `target/release/sff` and installed to `~/.cargo/bin/sff`.
 
 I use this tool myself to scan my personal notes. In the past these were simple .txt files in a folder until I migrated everything to iCloud + Obsidian. Here is some sample output from some random notes:
 
