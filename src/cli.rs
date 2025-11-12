@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "sff", // Changed from semanticfinder
+    name = "sff",
     author = "Dominik Weckmüller",
-    version = "0.1.0",
-    about = "sff: Fast semantic file finder", // Updated for clarity
+    version = "0.3.0", // Updated version for the new release
+    about = "sff: Fast semantic file finder",
     long_about = "sff (SemanticFileFinder) searches for files in a given directory based on the semantic meaning of a query with model2vec-rs. It reads .txt, .md, and .mdx files, chunks their content and ranks by similarity to find the most relevant text snippets."
 )]
 pub struct Args {
@@ -35,6 +35,6 @@ pub struct Args {
     pub verbose: bool,
 
     /// Output results in JSON format instead of table
-    #[arg(short = 'j', long)]
+    #[arg(long)] // Using long flag --json as is idiomatic
     pub json: bool,
 }
