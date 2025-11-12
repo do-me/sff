@@ -5,6 +5,7 @@ use crate::cli::Args;
 use anyhow::{Context, Result};
 use clap::Parser;
 use comfy_table::{presets::UTF8_FULL, Cell, ContentArrangement, Table};
+use glob::Pattern;
 use indicatif::{ProgressBar, ProgressStyle};
 use model2vec_rs::model::StaticModel; // Using the provided model2vec-rs
 use ndarray::{Array1, ArrayView1};
@@ -84,6 +85,11 @@ fn main() -> Result<()> {
         args.verbose,
         false,
         || {
+            // Compile the glob pattern if provided
+            let pattern = args.include.as_ref().and_then(|p| {
+                Pattern::new(p).ok()
+            });
+
             let walker =
                 WalkDir::new(&args.path).max_depth(if args.recursive { usize::MAX } else { 1 });
             let collected_chunks: Vec<TextChunk> = walker
@@ -93,6 +99,18 @@ fn main() -> Result<()> {
                 .filter(|e| e.file_type().is_file())
                 .filter_map(|entry| {
                     let path = entry.path();
+
+                    // Check if filename matches the include pattern (if provided)
+                    if let Some(ref pat) = pattern {
+                        if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                            if !pat.matches(filename) {
+                                return None;
+                            }
+                        } else {
+                            return None;
+                        }
+                    }
+
                     let extension = path.extension().and_then(|s| s.to_str());
                     match extension {
                         Some("txt") | Some("md") | Some("mdx") => match fs::read_to_string(path) {

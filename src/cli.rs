@@ -33,4 +33,8 @@ pub struct Args {
     /// Enable verbose mode to print detailed timings for nerds
     #[arg(short = 'v', long)]
     pub verbose: bool,
+
+    /// Filter files by glob pattern (e.g., "*.md", "notes-*.txt")
+    #[arg(short = 'i', long)]
+    pub include: Option<String>,
 }
