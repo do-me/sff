@@ -87,6 +87,11 @@ sff [OPTIONS] <QUERY>...
     sff -m "minishlab/potion-multilingual-128M" -l 5 "benefits of parallel computing"
     ```
 
+*   Format as JSON:
+    ```bash
+    sff "javascript" --json
+    ```
+
 **All Options:**
 
 You can view all available options with `sff --help`:
@@ -124,6 +129,9 @@ Options:
 
   -V, --version
           Print version
+
+  --json
+          Instead of table return JSON formatted output
 ```
 
 ## Models
