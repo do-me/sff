@@ -1,6 +1,8 @@
 use clap::Parser;
 use std::path::PathBuf;
 
+// const DEFAULT_EXTENSIONS: [&str; 4] = ["txt", "md", "mdx", "org"];
+
 #[derive(Parser, Debug)]
 #[command(
     name = "sff", // Changed from semanticfinder
@@ -33,4 +35,9 @@ pub struct Args {
     /// Enable verbose mode to print detailed timings for nerds
     #[arg(short = 'v', long)]
     pub verbose: bool,
+
+    /// Choose file extensions
+    // #[arg(short = 'e', long, default_values = DEFAULT_EXTENSIONS)]
+    #[arg(short = 'e', long, default_values = ["txt", "md", "mdx", "org"])]
+    pub extensions: Vec<String>
 }
