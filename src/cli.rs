@@ -40,5 +40,5 @@ pub struct Args {
 
     /// Choose file extensions
     #[arg(short = 'e', long, default_values = ["txt", "md", "mdx", "org"])]
-    pub extensions: Vec<String>,
+    pub extension: Vec<String>,
 }

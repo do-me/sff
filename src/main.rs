@@ -187,7 +187,7 @@ fn main() -> Result<()> {
                 .filter_map(|entry| {
                     let path = entry.path();
                     let extension = path.extension().and_then(|s| s.to_str())?;
-                    if args.extensions.contains(&extension.to_string()) {
+                    if args.extension.contains(&extension.to_string()) {
                         match fs::read_to_string(path) {
                             Ok(content) => Some((content, path.to_path_buf())),
                             Err(e) => {
