@@ -132,6 +132,12 @@ Options:
 
   --json
           Instead of table return JSON formatted output
+          
+  -e, --extension <EXTENSION>
+          Choose file extension to target,
+          or specify multiple extensions with separate arguments,
+          e.g. "-e md -e txt -e org" [default: txt md mdx org]
+
 ```
 
 ## Models
@@ -142,7 +148,6 @@ Options:
 
 ### Missing Args 
 - batch size - currently 128 texts of 20 words each are inferenced at the same time
-- filetypes - currently only .txt, .md, .mdx but should be customizable as args
 
 ### Chunker Options
 - For now, add more arguments like number of words for chunking

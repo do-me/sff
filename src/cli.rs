@@ -38,7 +38,9 @@ pub struct Args {
     #[arg(long)] // Using long flag --json as is idiomatic
     pub json: bool,
 
-    /// Choose file extensions
+    /// Choose file extension to target,
+    /// or specify multiple extensions with separate arguments,
+    /// e.g. "-e md -e txt -e org"
     #[arg(short = 'e', long, default_values = ["txt", "md", "mdx", "org"])]
     pub extension: Vec<String>,
 }
