@@ -5,11 +5,13 @@ use crate::cli::Args;
 use anyhow::{Context, Result};
 use clap::Parser;
 use comfy_table::{presets::UTF8_FULL, Cell, ContentArrangement, Table};
+use glob::Pattern;
 use indicatif::{ProgressBar, ProgressStyle};
 use model2vec_rs::model::StaticModel; // Using the provided model2vec-rs
 use ndarray::{Array1, ArrayView1};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,12 +30,46 @@ struct TextChunk {
     offset_in_line: usize,
 }
 
+#[derive(Serialize)]
 struct SearchResult {
     score: f32,
     path: PathBuf,
     chunk: String,
     line_number: usize,
     offset_in_line: usize,
+}
+
+#[derive(Serialize)]
+struct JsonOutput {
+    query: String,
+    total_chunks: usize,
+    total_files: usize,
+    search_time_ms: f64,
+    results: Vec<JsonResult>,
+}
+
+#[derive(Serialize)]
+struct JsonResult {
+    score: f32,
+    file_path: String,
+    chunk: String,
+    line_number: usize,
+    offset_in_line: usize,
+}
+
+#[derive(Deserialize, Debug)]
+struct PyProjectToml {
+    tool: Option<ToolSection>,
+}
+
+#[derive(Deserialize, Debug)]
+struct ToolSection {
+    sff: Option<SffConfig>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SffConfig {
+    exclude_dirs: Option<Vec<String>>,
 }
 
 const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
@@ -73,6 +109,37 @@ where
     }
 }
 
+fn load_exclude_dirs(search_path: &Path) -> Vec<String> {
+    let mut current_dir = search_path.to_path_buf();
+    
+    // Walk up the directory tree looking for pyproject.toml
+    loop {
+        let pyproject_path = current_dir.join("pyproject.toml");
+        
+        if pyproject_path.exists() {
+            if let Ok(contents) = fs::read_to_string(&pyproject_path) {
+                if let Ok(parsed) = toml::from_str::<PyProjectToml>(&contents) {
+                    if let Some(exclude_dirs) = parsed
+                        .tool
+                        .and_then(|t| t.sff)
+                        .and_then(|s| s.exclude_dirs)
+                    {
+                        return exclude_dirs;
+                    }
+                }
+            }
+        }
+        
+        // Move up one directory
+        if !current_dir.pop() {
+            break;
+        }
+    }
+    
+    // No default exclude patterns - let users configure them explicitly
+    vec![]
+}
+
 fn main() -> Result<()> {
     let program_total_start_time = Instant::now();
     let args = Args::parse();
@@ -84,10 +151,36 @@ fn main() -> Result<()> {
         args.verbose,
         false,
         || {
-            let walker =
-                WalkDir::new(&args.path).max_depth(if args.recursive { usize::MAX } else { 1 });
-            let collected_chunks: Vec<TextChunk> = walker
+            // Load exclude patterns from pyproject.toml
+            let exclude_patterns = load_exclude_dirs(&args.path);
+            let exclude_patterns: Vec<Pattern> = exclude_patterns
+                .iter()
+                .filter_map(|p| Pattern::new(p).ok())
+                .collect();
+                
+            let walker = WalkDir::new(&args.path)
+                .max_depth(if args.recursive { usize::MAX } else { 1 })
                 .into_iter()
+                .filter_entry(|entry| {
+                    // Get path relative to search root
+                    let relative_path = entry.path().strip_prefix(&args.path)
+                        .unwrap_or(entry.path())
+                        .to_string_lossy();
+                    
+                    // Check if any exclude pattern matches
+                    let should_exclude = exclude_patterns.iter().any(|pattern| {
+                        pattern.matches(&relative_path) || 
+                        pattern.matches(&entry.path().to_string_lossy())
+                    });
+                    
+                    if should_exclude && args.verbose {
+                        eprintln!("[VERBOSE] Excluding: {}", relative_path);
+                    }
+                    
+                    !should_exclude
+                });
+            
+            let collected_chunks: Vec<TextChunk> = walker
                 .filter_map(Result::ok)
                 .par_bridge()
                 .filter(|e| e.file_type().is_file())
@@ -203,92 +296,132 @@ fn main() -> Result<()> {
     }
     bar_chunk_embedding.set_message("Embedding file chunks...");
 
-    let chunk_embeddings: Vec<Vec<f32>> = timed_block("Chunk Embedding Generation", args.verbose, true, || {
-        chunks
-            .par_chunks(CHUNK_EMBEDDING_BATCH_SIZE)
-            .flat_map(|batch_of_text_chunks| {
-                let texts_for_batch: Vec<String> = batch_of_text_chunks.iter().map(|tc| tc.text.clone()).collect();
-                let embeddings_for_batch = model_arc.encode(&texts_for_batch);
-                bar_chunk_embedding.inc(batch_of_text_chunks.len() as u64);
-                embeddings_for_batch
-            })
-            .collect()
-    });
+    let chunk_embeddings: Vec<Vec<f32>> =
+        timed_block("Chunk Embedding Generation", args.verbose, true, || {
+            chunks
+                .par_chunks(CHUNK_EMBEDDING_BATCH_SIZE)
+                .flat_map(|batch_of_text_chunks| {
+                    let texts_for_batch: Vec<String> = batch_of_text_chunks
+                        .iter()
+                        .map(|tc| tc.text.clone())
+                        .collect();
+                    let embeddings_for_batch = model_arc.encode(&texts_for_batch);
+                    bar_chunk_embedding.inc(batch_of_text_chunks.len() as u64);
+                    embeddings_for_batch
+                })
+                .collect()
+        });
     bar_chunk_embedding.finish_with_message("Done embedding chunks.");
 
     // 5. CALCULATE SIMILARITY AND SORT RESULTS
     let query_vec: Array1<f32> = Array1::from(query_embedding);
 
-    let mut results: Vec<SearchResult> = timed_block("Similarity Calculation & Sorting", args.verbose,true, || {
-        let mut collected_results: Vec<SearchResult> = chunk_embeddings
-            .par_iter()
-            .enumerate()
-            .map(|(i, emb_ref)| {
-                let chunk_vec_view: ArrayView1<f32> = ArrayView1::from(emb_ref);
-                let sim = cosine_similarity(query_vec.view(), chunk_vec_view);
-                SearchResult {
-                    score: sim,
-                    path: chunks[i].path.clone(),
-                    chunk: chunks[i].text.clone(),
-                    line_number: chunks[i].line_number.clone(),
-                    offset_in_line: chunks[i].offset_in_line.clone(),
-                }
-            })
-            .collect();
+    let mut results: Vec<SearchResult> = timed_block(
+        "Similarity Calculation & Sorting",
+        args.verbose,
+        true,
+        || {
+            let mut collected_results: Vec<SearchResult> = chunk_embeddings
+                .par_iter()
+                .enumerate()
+                .map(|(i, emb_ref)| {
+                    let chunk_vec_view: ArrayView1<f32> = ArrayView1::from(emb_ref);
+                    let sim = cosine_similarity(query_vec.view(), chunk_vec_view);
+                    SearchResult {
+                        score: sim,
+                        path: chunks[i].path.clone(),
+                        chunk: chunks[i].text.clone(),
+                        line_number: chunks[i].line_number.clone(),
+                        offset_in_line: chunks[i].offset_in_line.clone(),
+                    }
+                })
+                .collect();
 
-        collected_results.par_sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        collected_results
-    });
+            collected_results.par_sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            collected_results
+        },
+    );
 
-    // 6. PRETTY-PRINT THE RESULTS
+    // 6. OUTPUT THE RESULTS
     if args.verbose {
         eprintln!("[VERBOSE] Result Printing Start");
     }
 
     let elapsed_time_total = program_total_start_time.elapsed();
-    println!(
-        "\nFound {} relevant chunks from {} files for query \"{}\" in {:.2} ms. Top {} results:",
-        results.len(),
-        file_count,
-        query_string,
-        elapsed_time_total.as_secs_f64() * 1000.0,
-        args.limit.min(results.len())
-    );
 
-    if !results.is_empty() {
-        let mut table = Table::new();
-        table
-            .load_preset(UTF8_FULL)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec![
-                Cell::new("Score"),
-                Cell::new("Matching Text Chunk"),
-                Cell::new("File Path"),
-            ]);
+    if args.json {
+        // JSON output
+        let json_results: Vec<JsonResult> = results
+            .iter()
+            .take(args.limit)
+            .map(|result| JsonResult {
+                score: result.score,
+                file_path: result.path.to_string_lossy().to_string(),
+                chunk: result.chunk.clone(),
+                line_number: result.line_number,
+                offset_in_line: result.offset_in_line,
+            })
+            .collect();
 
-        for result in results.iter_mut().take(args.limit) {
-            const MAX_CHUNK_DISPLAY_LEN: usize = 100;
-            if result.chunk.chars().count() > MAX_CHUNK_DISPLAY_LEN {
-                result.chunk = result
-                    .chunk
-                    .chars()
-                    .take(MAX_CHUNK_DISPLAY_LEN)
-                    .collect::<String>()
-                    + "...";
-            }
-            table.add_row(vec![
-                Cell::new(format!("{:.2}", result.score)),
-                Cell::new(&result.chunk),
-                Cell::new(format_path_for_terminal(
-                    &result.path,
-                    &result.line_number,
-                    &result.offset_in_line,
-                )),
-            ]);
-        }
-        println!("{table}");
+        let json_output = JsonOutput {
+            query: query_string,
+            total_chunks: results.len(),
+            total_files: file_count,
+            search_time_ms: elapsed_time_total.as_secs_f64() * 1000.0,
+            results: json_results,
+        };
+
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else {
-        println!("No matches found.");
+        // Table output (existing logic)
+        println!(
+            "\nFound {} relevant chunks from {} files for query \"{}\" in {:.2} ms. Top {} results:",
+            results.len(),
+            file_count,
+            query_string,
+            elapsed_time_total.as_secs_f64() * 1000.0,
+            args.limit.min(results.len())
+        );
+
+        if !results.is_empty() {
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_header(vec![
+                    Cell::new("Score"),
+                    Cell::new("Matching Text Chunk"),
+                    Cell::new("File Path"),
+                ]);
+
+            for result in results.iter_mut().take(args.limit) {
+                const MAX_CHUNK_DISPLAY_LEN: usize = 100;
+                if result.chunk.chars().count() > MAX_CHUNK_DISPLAY_LEN {
+                    result.chunk = result
+                        .chunk
+                        .chars()
+                        .take(MAX_CHUNK_DISPLAY_LEN)
+                        .collect::<String>()
+                        + "...";
+                }
+                table.add_row(vec![
+                    Cell::new(format!("{:.2}", result.score)),
+                    Cell::new(&result.chunk),
+                    Cell::new(format_path_for_terminal(
+                        &result.path,
+                        &result.line_number,
+                        &result.offset_in_line,
+                    )),
+                ]);
+            }
+            println!("{table}");
+        } else {
+            println!("No matches found.");
+        }
     }
 
     if args.verbose {
