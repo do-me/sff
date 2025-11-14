@@ -135,8 +135,9 @@ Options:
           
   -e, --extension <EXTENSION>
           Choose file extension to target,
-          or specify multiple extensions with separate arguments,
-          e.g. "-e md -e txt -e org" [default: txt md mdx org]
+          or multiple extensions delimited with "," (e.g. "-e md,org"), 
+          or with separate arguments (e.g. "-e md -e org") 
+          [default: txt md mdx org]
 
 ```
 

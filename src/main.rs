@@ -256,7 +256,10 @@ fn main() -> Result<()> {
 
     if chunks.is_empty() {
         println!(
-            "No text files (.txt, .md, .mdx) found to search in '{}'.",
+            "No text files of type {} found to search in '{}'.",
+            args.extension.iter().map(|s| {
+                ".".to_string() + s
+            }).collect::<Vec<_>>().join(", "),
             args.path.display()
         );
         return Ok(());
