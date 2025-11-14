@@ -183,7 +183,7 @@ How to publish a new release on crates.io (mainly notes to myself):
 
 1. Check that any new feature is documented properly in the readme
 2. Update version number in `cli.rs` & `Cargo.toml`
-3. Commit these changes as preparation for new release: `git add .`, `git commit -m "Prepare for version MAJOR.MINOR.PATCH"`, `git push`
+3. Commit these changes as preparation for new release: `git add .`, `git commit -m "Prepare for vMAJOR.MINOR.PATCH"`, `git push`
 4. `cargo publish`
 5. Tag the release properly `git tag vMAJOR.MINOR.PATCH`, `git push origin vMAJOR.MINOR.PATCH`
 
