@@ -37,4 +37,10 @@ pub struct Args {
     /// Output results in JSON format instead of table
     #[arg(long)] // Using long flag --json as is idiomatic
     pub json: bool,
+
+    /// Choose file extension to target,
+    /// or multiple extensions delimited with "," (e.g. "-e md,org"),
+    /// or with separate arguments (e.g. "-e md -e org")
+    #[arg(short = 'e', long, default_values = ["txt", "md", "mdx", "org"], value_delimiter = ',')]
+    pub extension: Vec<String>,
 }
