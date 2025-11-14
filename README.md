@@ -172,5 +172,20 @@ Reopen the shell and the problem should be fixed.
 
 * MIT
 
+## Dev Notes 
+
+### Versioning
+This repo is following [semantic versioning](https://semver.org/) in this format MAJOR.MINOR.PATCH, where MAJOR includes breaking changes, MINOR means backward-compatible changes/features and PATCH is just used for bug fixes. Most of the releases you see here should be MINOR so you can simply update this sff crate from time to time to see what's new.
+
+### Publishing
+
+How to publish a new release on crates.io (mainly notes to myself):
+
+1. Check that any new feature is documented properly in the readme
+2. Update version number in `cli.rs` & `Cargo.toml`
+3. Commit these changes as preparation for new release: `git add .`, `git commit -m "Prepare for version MAJOR.MINOR.PATCH"`, `git push`
+4. `cargo publish`
+5. Tag the release properly `git tag vMAJOR.MINOR.PATCH`, `git push origin vMAJOR.MINOR.PATCH`
+
 ---
 Built by Dominik Weckmüller. If you like semantic search, check out my other work on [GitHub](https://github.com/do-me) e.g. [SemanticFinder](https://github.com/do-me/SemanticFinder)!

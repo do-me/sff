@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[command(
     name = "sff",
     author = "Dominik Weckmüller",
-    version = "0.3.0", // Updated version for the new release
+    version = "0.4.0", // Updated version for the new release
     about = "sff: Fast semantic file finder",
     long_about = "sff (SemanticFileFinder) searches for files in a given directory based on the semantic meaning of a query with model2vec-rs. It reads .txt, .md, and .mdx files, chunks their content and ranks by similarity to find the most relevant text snippets."
 )]
