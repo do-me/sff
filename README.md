@@ -37,14 +37,14 @@ I use this tool myself to scan my personal notes. In the past these were simple 
 
 ## Performance 
 
-tl;dr: under 250ms for English-only models on ~2500 files and 10k chunks (with 20 words per chunk) on an M3 Max. If you need the best possible results and good multilingual retrieval, go for `minishlab/potion-multilingual-128M`.
-Else, stick to the default with `minishlab/potion-retrieval-32M`. Keep an eye on new model2vec models here: https://huggingface.co/minishlab.
+tl;dr: under 350ms on ~1000 files and ~46k chunks (with 20 words per chunk) on an M3 Max, including model loading. The default `minishlab/blink-multilingual-64M` works well across 100+ languages. For English-only text, `minishlab/blink-8M` is about 4x faster. Keep an eye on new model2vec models here: https://huggingface.co/minishlab.
 
-| Command                                                                     | Model                    | Query      | Files | Chunks | Time (ms) |
-| --------------------------------------------------------------------------- | ------------------------ | ---------- | ----- | ------ | --------- |
-| `sff -m "minishlab/potion-base-8M" "javascript"`           | potion-base-8M           | javascript | 2537  | 10000  | 209.34    |
-| `sff -m "minishlab/potion-retrieval-32M" "javascript"`     | potion-retrieval-32M     | javascript | 2537  | 10000  | 249.95    |
-| `sff -m "minishlab/potion-multilingual-128M" "javascript"` | potion-multilingual-128M | javascript | 2537  | 10000  | 1001.69   |
+| Command                                                    | Model                    | Query      | Files | Chunks | Time (ms) |
+| ---------------------------------------------------------- | ------------------------ | ---------- | ----- | ------ | --------- |
+| `sff -r -m "minishlab/blink-8M" "javascript"`              | blink-8M                 | javascript | 991   | 45937  | 86        |
+| `sff -r -m "minishlab/potion-retrieval-32M" "javascript"`  | potion-retrieval-32M     | javascript | 991   | 45937  | 120       |
+| `sff -r "javascript"`                                      | blink-multilingual-64M   | javascript | 991   | 45937  | 334       |
+| `sff -r -m "minishlab/potion-multilingual-128M" "javascript"` | potion-multilingual-128M | javascript | 991 | 45937 | 983       |
 
 ## Features
 
@@ -84,7 +84,7 @@ sff [OPTIONS] <QUERY>...
 
 *   Use a different model and limit results to 5:
     ```bash
-    sff -m "minishlab/potion-multilingual-128M" -l 5 "benefits of parallel computing"
+    sff -m "minishlab/blink-8M" -l 5 "benefits of parallel computing"
     ```
 
 *   Format as JSON:
@@ -112,7 +112,7 @@ Options:
 
   -m, --model <MODEL>
           Model to use for embeddings, from Hugging Face Hub or local path
-          [default: minishlab/potion-retrieval-32M]
+          [default: minishlab/blink-multilingual-64M]
 
   -l, --limit <LIMIT>
           Number of top results to display
@@ -143,7 +143,7 @@ Options:
 
 ## Models
 
-`sff` uses `model2vec-rs`, which typically downloads models from the [Hugging Face Hub](https://huggingface.co/models). The default model is `minishlab/potion-retrieval-32M`. You can specify any compatible sentence transformer model available on the Hub or a local path to a model. The first time you use a new model, it will be downloaded, which might take some time.
+`sff` uses `model2vec-rs`, which typically downloads models from the [Hugging Face Hub](https://huggingface.co/models). The default model is [`minishlab/blink-multilingual-64M`](https://huggingface.co/minishlab/blink-multilingual-64M). For English-only text, [`minishlab/blink-8M`](https://huggingface.co/minishlab/blink-8M) is smaller and faster. You can specify any compatible sentence transformer model available on the Hub or a local path to a model. The first time you use a new model, it will be downloaded, which might take some time.
 
 ## Roadmap 
 
