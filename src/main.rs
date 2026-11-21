@@ -1,6 +1,8 @@
 mod cli;
+mod discover;
 
 use crate::cli::Args;
+use crate::discover::discover_files;
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
@@ -19,7 +21,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use unicode_categories::UnicodeCategories;
-use walkdir::WalkDir;
 
 const CHUNK_EMBEDDING_BATCH_SIZE: usize = 128; // How many text chunks to embed in one go per parallel task
 const WORD_CHUNK_SIZE: usize = 20; // How many words per text chunk
@@ -388,46 +389,24 @@ fn main() -> Result<()> {
                 .filter_map(|p| Pattern::new(p).ok())
                 .collect();
                 
-            let walker = WalkDir::new(&args.path)
-                .max_depth(if args.recursive { usize::MAX } else { 1 })
-                .into_iter()
-                .filter_entry(|entry| {
-                    // Get path relative to search root
-                    let relative_path = entry.path().strip_prefix(&args.path)
-                        .unwrap_or(entry.path())
-                        .to_string_lossy();
-                    
-                    // Check if any exclude pattern matches
-                    let should_exclude = exclude_patterns.iter().any(|pattern| {
-                        pattern.matches(&relative_path) || 
-                        pattern.matches(&entry.path().to_string_lossy())
-                    });
-                    
-                    if should_exclude && args.verbose {
-                        eprintln!("[VERBOSE] Excluding: {}", relative_path);
-                    }
-                    
-                    !should_exclude
-                });
-            
-            let collected_chunks: Vec<TextChunk> = walker
-                .filter_map(Result::ok)
-                .par_bridge()
-                .filter(|e| e.file_type().is_file())
-                .filter_map(|entry| {
-                    let path = entry.path();
-                    let extension = path.extension().and_then(|s| s.to_str())?;
-                    if args.extension.contains(&extension.to_string()) {
-                        match fs::read_to_string(path) {
-                            Ok(content) => Some((content, path.to_path_buf())),
-                            Err(e) => {
-                                if args.verbose {
-                                    eprintln!("[VERBOSE] Failed to read {}: {}", path.display(), e);
-                                }
-                                None
-                            }
+            let paths = discover_files(
+                &args.path,
+                args.recursive,
+                &args.extension,
+                &exclude_patterns,
+                args.verbose,
+            );
+
+            let collected_chunks: Vec<TextChunk> = paths
+                .into_par_iter()
+                .filter_map(|path| match fs::read_to_string(&path) {
+                    Ok(content) => Some((content, path)),
+                    Err(e) => {
+                        if args.verbose {
+                            eprintln!("[VERBOSE] Failed to read {}: {}", path.display(), e);
                         }
-                    } else {None}
+                        None
+                    }
                 })
                 .flat_map(|(content, path)| {
                     let mut words: Vec<(usize, usize)> = Vec::new(); // Vec<(start, end)>
