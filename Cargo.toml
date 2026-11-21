@@ -1,6 +1,6 @@
 [package]
 name = "sff"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Dominik Weckmüller"] # Replace with your actual name/handle if different
 description = "SemanticFileFinder (sff): Fast semantic file finder using sentence embeddings. Searches .txt, .md, .mdx files."
 readme = "README.md"
