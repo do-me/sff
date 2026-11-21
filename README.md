@@ -46,13 +46,15 @@ tl;dr: under 350ms on ~1000 files and ~46k chunks (with 20 words per chunk) on a
 | `sff -r "javascript"`                                      | blink-multilingual-64M   | javascript | 991   | 45937  | 334       |
 | `sff -r -m "minishlab/potion-multilingual-128M" "javascript"` | potion-multilingual-128M | javascript | 991 | 45937 | 983       |
 
+Directories are walked in parallel, so large trees are scanned quickly. On a folder with ~1.86M files (1.84M of them images in a single directory) and 335 text files, file discovery takes ~2.8s instead of ~5.4s in v0.5.0 (warm cache, M3 Max). Most of the remaining time is the OS listing that one huge directory.
+
 ## Features
 
 *   **Semantic Search:** Finds files based on meaning, not just exact keyword matches.
 *   **Supported Files:** Scans `.txt`, `.md`, and `.mdx` files.
 *   **Content Chunking:** Breaks down documents into smaller, manageable chunks for precise matching.
 *   **Embedding Powered:** Uses `model2vec-rs` to generate text embeddings. Models are typically downloaded from Hugging Face Hub.
-*   **Fast & Parallelized:** Utilizes Rayon for parallel processing of file discovery, embedding generation, and similarity calculation.
+*   **Fast & Parallelized:** Utilizes Rayon for parallel directory walking, file reading, embedding generation, and similarity calculation.
 *   **Customizable:**
     *   Specify search directory.
     *   Define your semantic query.
